@@ -1,0 +1,17 @@
+metrics:
+  enabled: true
+
+extraPlugins: "rabbitmq_auth_backend_ldap rabbitmq_federation"
+
+clustering:
+  enabled: true
+  rebalance: true
+  forceBoot: true
+  addressType: hostname
+
+replicaCount: 1
+
+auth:
+  username: keda
+  password: test123
+  erlangCookie: 12312312jhg1jh2gj3hg1jh2g3jh123

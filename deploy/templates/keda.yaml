@@ -1,0 +1,65 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ include "deploy.fullname" . }}
+spec:
+  secretTargetRef:
+    - parameter: host  # scaledobject parameter name
+      name: {{ include "deploy.fullname" . }}  # secret name
+      key: AMQP_URI   # secret key name
+  env:                              # Optional.
+  - parameter: queueName             # Required - Defined by the scale trigger
+    name: QUEUE_NAME              # Required.
+    containerName: {{ include "deploy.fullname" . }}
+
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "deploy.fullname" . }}
+spec:
+  scaleTargetRef:
+    name: {{ include "deploy.fullname" . }}
+    kind: Deployment
+    apiVersion: apps/v1
+  triggers:
+  - type: rabbitmq      # Reference: https://keda.sh/docs/2.0/scalers/rabbitmq-queue/
+    authenticationRef:
+      name: {{ include "deploy.fullname" . }}
+    metadata:
+      # host: amqp://keda:test123@rabbitmq:5672/   ## Consider using from hostFromEnv or TriggerAuthentication
+      protocol: amqp
+      port: "5672"
+      queueName: poc-keda
+      mode: QueueLength
+      value: "5"
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 10             # interval to check each trigger on. Default = 30 secs
+  cooldownPeriod:                 # period to wait after last trigger reported before scaling resource back to 0
+  fallback:                       # defines a number of replicas to fall back to if a scaler is in an error state.
+    failureThreshold: 3
+    replicas: 2
+
+  advanced:    # Reference: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
+
+    restoreToOriginalReplicaCount: true  # defines whether the target resource should be scaled back to original replica count after ScaledOjbect is deleted.
+                                         # Default: keep replica count at same number as it is in the moment of ScaledObject's deletion
+    
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 30  # used to restrict the flapping of replica count when the metrics used for scaling keep fluctuating.
+          # When the metrics indicate that the target should be scaled down the algorithm looks into previously computed desired states, and uses the highest value from the specified interval. In the above example, all desired states from the past 5 minutes will be considered.
+          
+          policies:
+            - type: Pods
+              value: 1                     # Allow at most 1 Pods to scale down in 10 seconds
+              periodSeconds: 10            # length of time in the past for which the policy must hold true
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Pods
+              value: 3                     # Allow at most 2 Pods to scale up in 10 seconds
+              periodSeconds: 10
