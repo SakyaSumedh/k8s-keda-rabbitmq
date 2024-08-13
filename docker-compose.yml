@@ -1,0 +1,42 @@
+version: "3.9"
+
+networks:
+  rabbitmq:
+    driver: bridge
+
+volumes:
+  rabbitmq:
+
+services:
+  app:
+    container_name: keda-rabbitmq-app
+    build:
+      context: ./app
+    ports:
+      - 8000:8000
+    volumes:
+      - ./app:/app
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_USER=keda
+      - RABBITMQ_PASSWORD=test123
+      - QUEUE_NAME=poc-keda
+      - EXCHANGE_NAME=keda
+    depends_on:
+      - rabbitmq
+    networks:
+      - rabbitmq
+    restart: always
+  
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    container_name: keda-rabbitmq-mq
+    ports:
+      - 5672:5672
+    environment:
+      - RABBITMQ_DEFAULT_PASS=test123
+      - RABBITMQ_DEFAULT_USER=keda
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    networks:
+      - rabbitmq
